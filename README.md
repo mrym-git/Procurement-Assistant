@@ -1,48 +1,30 @@
-<<<<<<< HEAD
+# California State Procurement Data — EDA & MongoDB Loader
 
-# Procurement-Assistant
+Cleans and loads California procurement data (2012–2015) into MongoDB for use with an AI agent.
 
-=======
+## Setup
 
-# 🛒 Procurement AI Assistant
-
-An AI-powered chatbot that answers natural language questions about
-California State procurement data using Claude AI and MongoDB.
-
-## Tech Stack
-
-- **Backend**: Python, FastAPI, LangChain, Claude AI
-- **Database**: MongoDB
-- **Frontend**: HTML, CSS, JavaScript
-
-## Setup Instructions
-
-### 1. Clone the repo
-
-git clone https://github.com/yourusername/procurement-assistant.git
-cd procurement-assistant
-
-### 2. Setup Backend
-
-cd backend
+### 1. Install dependencies
+```
 pip install -r requirements.txt
+```
 
-### 3. Add your API key
+### 2. Get the data
+Download the CSV from Kaggle:
+https://www.kaggle.com/datasets/samuelcortinhas/california-state-procurement-data
 
-Create a .env file:
-ANTHROPIC_API_KEY=your_key_here
-MONGO_URI=mongodb://localhost:27017/
+Place the CSV file in the same folder as the notebook:
+```
+procurement-assistant/
+├── PURCHASE ORDER DATA EXTRACT 2012-2015_0.csv
+└── explore_data.ipynb
+```
 
-### 4. Load the data
+### 3. Start MongoDB
+Make sure MongoDB is running locally on port 27017.
+Install guide: https://www.mongodb.com/docs/manual/installation/
 
-python load_data.py
-
-### 5. Start the backend
-
-uvicorn main:app --reload --port 8000
-
-### 6. Open the frontend
-
-Open frontend/index.html in your browser
-
-> > > > > > > 251ecb0 (first commit)
+### 4. Run the notebook
+```
+jupyter notebook explore_data.ipynb
+```

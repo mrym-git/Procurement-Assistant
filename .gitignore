@@ -2,6 +2,7 @@
 backend/dataset/*.csv
 backend/dataset/*.docx
 backend/dataset/*.pdf
+*.csv
 
 # Python
 __pycache__/
