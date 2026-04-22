@@ -5,7 +5,9 @@
       "Bash(git push:*)",
       "Bash(git filter-branch:*)",
       "Bash(git add:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(python explore_data.py)",
+      "Bash(pip install:*)"
     ]
   }
 }
