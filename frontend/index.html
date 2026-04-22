@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procurement AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛒 Procurement AI Assistant</h1>
+            <p>Ask me anything about California State procurement data</p>
+        </header>
+
+        <div class="chat-box" id="chatBox">
+            <div class="message bot-message">
+                Hello! I can help you analyze California's procurement data. 
+                Try asking me things like:
+                <ul>
+                    <li>"What was the total spending in 2023?"</li>
+                    <li>"Which department spent the most?"</li>
+                    <li>"What are the top 5 most ordered items?"</li>
+                    <li>"Which quarter had the highest spending?"</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input 
+                type="text" 
+                id="userInput" 
+                placeholder="Ask a question about procurement data..."
+                onkeypress="handleKeyPress(event)"
+            />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+
+        <div class="sample-questions">
+            <p>Try these:</p>
+            <button onclick="askSample('How many orders were created in Q1 2023?')">Q1 2023 Orders</button>
+            <button onclick="askSample('Which quarter had the highest total spending?')">Highest Spending Quarter</button>
+            <button onclick="askSample('What are the top 10 most frequently ordered items?')">Top Items</button>
+            <button onclick="askSample('Which supplier received the most money?')">Top Supplier</button>
+            <button onclick="askSample('What is the total spending by department?')">By Department</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
