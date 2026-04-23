@@ -8,7 +8,9 @@
       "Bash(chmod:*)",
       "Bash(python explore_data.py)",
       "Bash(pip install:*)",
-      "Bash(\"C:\\\\Users\\\\SP7\\\\Desktop\\\\procurement-assistant\\\\README.md\":*)"
+      "Bash(\"C:\\\\Users\\\\SP7\\\\Desktop\\\\procurement-assistant\\\\README.md\":*)",
+      "Bash(sc query:*)",
+      "Bash(netstat -ano)"
     ]
   }
 }
