@@ -53,7 +53,7 @@
   3. Backend executes the pipeline
   4. Result passed back to LLM to formulate a natural language answer
 - [ ] Handle edge cases: empty results, invalid queries, ambiguous questions
-- [ ] Use **Anthropic Claude API** (`claude-opus-4-6`) — already set up in the project
+- [ ] Use **OpenAI API** (`gpt-4.5-mini`)
 
 **Suggested tools to expose to the agent:**
 | Tool | Purpose |
@@ -131,7 +131,7 @@ Test the assistant with these queries to verify accuracy:
 | Layer | Technology |
 |-------|-----------|
 | Database | MongoDB (`localhost:27017`) |
-| LLM | Claude (`claude-opus-4-6`) via Anthropic API |
+| LLM | GPT-4.5-mini (`gpt-4.5-mini`) via OpenAI API |
 | Backend | Python — FastAPI |
 | Frontend | Vanilla HTML/CSS/JS |
 | Data prep | Pandas, Jupyter |
