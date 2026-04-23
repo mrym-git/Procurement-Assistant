@@ -61,7 +61,7 @@
   2. LangChain agent decides which tool(s) to call
   3. `query_orders` tool builds and executes the MongoDB pipeline
   4. Agent receives results and formulates a natural language answer
-- [ ] Use **OpenAI API** (`gpt-4.5-mini`) as the LLM backing the agent
+- [ ] Use **OpenAI API** (`gpt-4.5`) as the LLM backing the agent
 - [ ] Handle edge cases: empty results, invalid pipelines, ambiguous questions
 
 ---
@@ -133,7 +133,7 @@ Test the assistant with these queries to verify accuracy:
 | Layer | Technology |
 |-------|-----------|
 | Database | MongoDB (`localhost:27017`) |
-| LLM | GPT-4.5-mini (`gpt-4.5-mini`) via OpenAI API |
+| LLM | GPT-4.5-mini (`gpt-4.5`) via OpenAI API |
 | Agentic Framework | LangChain — tools, agent executor, conversation memory |
 | Backend | Python — FastAPI |
 | Frontend | Vanilla HTML/CSS/JS |

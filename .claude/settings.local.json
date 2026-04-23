@@ -12,7 +12,8 @@
       "Bash(sc query:*)",
       "Bash(netstat -ano)",
       "Bash(python main.py)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(powershell -Command \"Get-Process python | Stop-Process -Force\")"
     ]
   }
 }

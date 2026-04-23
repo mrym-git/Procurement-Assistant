@@ -148,7 +148,7 @@ RULES:
 """
 
 # ── LLM + Agent setup (LangGraph) ────────────────────────────────────────────
-_llm   = ChatOpenAI(model="gpt-4.5-mini", temperature=0)
+_llm   = ChatOpenAI(model="gpt-5.4-mini", temperature=0)
 _tools = [get_schema, get_date_range, query_orders]
 
 # create_react_agent from langgraph.prebuilt — replaces deprecated AgentExecutor
