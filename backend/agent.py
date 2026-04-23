@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from datetime import datetime
 from typing import Any
@@ -20,8 +21,19 @@ _collection = _client["procurement_db"]["orders"]
 # ── In-memory session history (session_id → list of messages) ─────────────────
 _histories: dict[str, list] = {}
 
-# ── JSON serializer — handles datetime, ObjectId, int64 ──────────────────────
+# ── JSON serializer — handles datetime, ObjectId, NaN, int64, float64 ────────
 def _serialize(obj: Any) -> Any:
+    if obj is None:
+        return None
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        # NaN and Inf are not valid JSON — replace with None so the LLM sees null
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, int):
+        return obj
     if isinstance(obj, datetime):
         return obj.isoformat()
     if isinstance(obj, ObjectId):
@@ -30,9 +42,12 @@ def _serialize(obj: Any) -> Any:
         return {k: _serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_serialize(i) for i in obj]
+    # numpy int64, float64, pandas NA, etc.
     try:
-        # handles numpy int64, float64, pandas NA, etc.
-        return int(obj) if hasattr(obj, '__int__') else float(obj)
+        f = float(obj)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return int(f) if f == int(f) else f
     except Exception:
         return str(obj)
 
@@ -105,7 +120,7 @@ def query_orders(pipeline_json: str) -> str:
     Rules:
     - Always add a {"$limit": 50} stage at the end of pipelines that may return many documents.
     - Use field names exactly as in the schema (snake_case).
-    - For spending queries, use {"$match": {"total_price": {"$ne": null}}} to exclude nulls.
+    - For spending queries, ALWAYS use {"$match": {"total_price": {"$gt": 0}}} as the FIRST stage to exclude null, NaN, and negative values.
     """
     try:
         pipeline = json.loads(pipeline_json)
@@ -114,11 +129,20 @@ def query_orders(pipeline_json: str) -> str:
     except json.JSONDecodeError as e:
         return f"Error: invalid JSON — {e}"
 
-    # Auto-inject total_price filter if pipeline touches price but has no $gt guard
+    # Auto-inject total_price guard at the front of the pipeline.
+    # Condition: pipeline references total_price AND the very first stage is not
+    # already a $match with {total_price: {$gt: 0}}.
+    # We check only the first stage so that a $gt on a different field (e.g. unit_price)
+    # or a $gt placed after a $group does NOT suppress the injection.
     pipeline_str = json.dumps(pipeline)
-    needs_price_filter = "total_price" in pipeline_str and '"$gt"' not in pipeline_str
-    if needs_price_filter:
-        pipeline = [{"$match": {"total_price": {"$gt": 0}}}] + pipeline
+    if "total_price" in pipeline_str:
+        first_stage_is_guard = (
+            pipeline
+            and "$match" in pipeline[0]
+            and pipeline[0]["$match"].get("total_price", {}).get("$gt") == 0
+        )
+        if not first_stage_is_guard:
+            pipeline = [{"$match": {"total_price": {"$gt": 0}}}] + pipeline
 
     try:
         results = list(_collection.aggregate(pipeline))

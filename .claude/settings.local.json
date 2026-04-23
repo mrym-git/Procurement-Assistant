@@ -13,7 +13,8 @@
       "Bash(netstat -ano)",
       "Bash(python main.py)",
       "Bash(taskkill:*)",
-      "Bash(powershell -Command \"Get-Process python | Stop-Process -Force\")"
+      "Bash(powershell -Command \"Get-Process python | Stop-Process -Force\")",
+      "Bash(start \"\" cmd /k \"cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload\")"
     ]
   }
 }
