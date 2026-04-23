@@ -127,6 +127,84 @@ A full clean reload was performed after discovering BSON Double NaN values in Mo
 
 ---
 
+### Phase 5 — Agent Architecture Upgrade (Complete)
+
+Upgraded the system from a basic LLM tool loop into a proper AI agent architecture with validation, reasoning, memory, and scope awareness. **Zero existing code was removed** — only new modules added and `agent.py` minimally patched.
+
+#### New modules created
+
+| File | Purpose |
+|---|---|
+| `backend/query_validator.py` | `validate_pipeline()` — sanitizes every LLM-generated pipeline before MongoDB execution |
+| `backend/query_explainer.py` | `explain_query()` — rule-based NL explanation of what a pipeline does |
+| `backend/session_memory.py` | `SessionMemory` class — stateful per-session result store; resolves follow-up references |
+| `backend/scope_detector.py` | `is_out_of_scope()` — detects and rejects off-topic questions before agent runs |
+
+#### `query_validator.py` — Pipeline Guardrails
+
+- Blocks dangerous stages: `$lookup`, `$out`, `$merge`, `$function`, `$accumulator`
+- Guarantees first stage is always `{$match: {total_price: {$gt: 0}}}` — injects or merges if missing
+- Appends `{$limit: 5000}` when no scoping filter (year/month/quarter/supplier/department) is present — prevents full-collection scans
+- Raises `ValueError` on malformed pipeline structure
+
+#### `query_explainer.py` — Reasoning Layer
+
+- Rule-based: reads each pipeline stage (`$match`, `$group`, `$sort`, `$limit`, `$count`, `$project`, `$unwind`)
+- Produces: `"Reasoning: filtered orders where total_price > 0, year = 2014 -> grouped by (year, quarter) and summed total_price -> sorted by total (highest first) -> limited to top 1 results."`
+- Output prepended to tool result so LLM includes reasoning in the final answer
+
+#### `session_memory.py` — Stateful Analytics
+
+- `SessionMemory.save_result(session_id, key, value)` / `get_result(session_id, key)` — generic store
+- `extract_and_save()` — auto-inspects pipeline + results, saves:
+  - `highest_spend_quarter` → `{year, quarter, total}`
+  - `highest_order_quarter` → `{year, quarter, count}`
+  - `last_supplier_result` → top supplier list
+  - `last_department_result` → top department list
+  - `last_query_pipeline` + `last_result_raw`
+- `context_summary()` — returns a `[Stored context]` block injected as `SystemMessage` before each turn, enabling the LLM to resolve "that quarter" / "the same supplier" without re-querying
+
+#### `scope_detector.py` — Out-of-Scope Detection
+
+- Regex patterns catch explicit off-topic questions (governor, weather, recipes, sports, etc.)
+- Procurement keyword set (60+ terms) fast-paths in-scope detection
+- Short inputs (≤4 words) pass through to the agent — handles greetings and follow-ups
+- Returns standard reply: *"This assistant only answers questions about the California State procurement dataset."*
+
+#### Changes to `agent.py` (minimal patch, nothing removed)
+
+| Location | Change |
+|---|---|
+| Imports | Added `contextvars`, `query_explainer`, `query_validator`, `scope_detector`, `session_memory` |
+| Module level | Added `_current_session_id` contextvar — passes session_id into tool scope without changing signature |
+| `query_orders` body | Replaced manual `$gt` inject with `validate_pipeline()` + `explain_query()` + `memory.extract_and_save()` |
+| `chat()` function | Added scope check → contextvar set → session context `SystemMessage` injection → agent invoke |
+| `SYSTEM_PROMPT` | Added multi-step workflow instructions, context resolution rules, reasoning citation rule |
+
+#### Request flow after upgrade
+
+```
+User question
+  -> scope_detector        (off-topic? return standard reply immediately)
+  -> session context       (inject [Stored context] as SystemMessage)
+  -> LangGraph agent       (may call tools multiple times for multi-step queries)
+      -> query_orders
+          -> validate_pipeline    (sanitize, inject guards, block dangerous stages)
+          -> MongoDB execute
+          -> memory.extract_and_save  (store key facts for follow-ups)
+          -> return "Reasoning: ... + results"
+  -> Final answer (includes reasoning, exact numbers)
+```
+
+#### Multi-step query support
+
+For questions like *"Who is the top supplier in the highest-spend quarter?"*:
+1. Agent runs pipeline 1 → gets highest-spend quarter → stored in `session_memory`
+2. Agent runs pipeline 2 → filters by that quarter → returns top supplier
+All automatic — no user prompt engineering required.
+
+---
+
 ### Phase 4 — Testing & Debugging (Complete)
 
 All 7 test queries verified against the live system:
@@ -166,7 +244,7 @@ All 7 test queries verified against the live system:
 |------|------|--------|
 | Morning | Run test queries, fix NaN bug, reload data, fix quarter mapping | ✅ Done |
 | Afternoon | Outlier investigation, data quality audit, null handling improvements | ✅ Done |
-| Evening | Final review, clean up code | 🔲 |
+| Evening | Agent architecture upgrade — validator, explainer, memory, scope detector | ✅ Done |
 
 ---
 
@@ -189,8 +267,12 @@ All 7 test queries verified against the live system:
 procurement-assistant/
 ├── explore_data.ipynb           ✅ Data prep, EDA, null handling, MongoDB load
 ├── backend/
-│   ├── agent.py                 ✅ LangGraph agent + 3 tools + NaN serializer fix
+│   ├── agent.py                 ✅ LangGraph agent + architecture layers integrated
 │   ├── main.py                  ✅ FastAPI server (chat, health, session endpoints)
+│   ├── query_validator.py       ✅ Pipeline guardrails (sanitize, inject guards, block dangerous stages)
+│   ├── query_explainer.py       ✅ Rule-based NL reasoning explanation
+│   ├── session_memory.py        ✅ Stateful per-session result store + context injection
+│   ├── scope_detector.py        ✅ Out-of-scope question detection
 │   ├── reload_data.py           ✅ Clean data reload script (drops NaN/zero rows)
 │   ├── fix_nan.py               ✅ One-time BSON NaN repair utility
 │   └── requirements.txt         ✅ Backend dependencies

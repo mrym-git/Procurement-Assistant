@@ -1,3 +1,4 @@
+import contextvars
 import json
 import math
 import os
@@ -11,6 +12,17 @@ from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from pymongo import MongoClient
+
+from query_explainer import explain_query
+from query_validator import validate_pipeline
+from scope_detector import is_out_of_scope, out_of_scope_reply
+from session_memory import memory
+
+# Context variable that carries the current session_id into tool scope
+# without changing the tool function signature.
+_current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "session_id", default=""
+)
 
 load_dotenv()
 
@@ -155,6 +167,7 @@ def query_orders(pipeline_json: str) -> str:
     - Use field names exactly as in the schema (snake_case).
     - For spending queries, ALWAYS use {"$match": {"total_price": {"$gt": 0}}} as the FIRST stage to exclude null, NaN, and negative values.
     """
+    # ── Parse ─────────────────────────────────────────────────────────────────
     try:
         pipeline = json.loads(pipeline_json)
         if not isinstance(pipeline, list):
@@ -162,30 +175,35 @@ def query_orders(pipeline_json: str) -> str:
     except json.JSONDecodeError as e:
         return f"Error: invalid JSON — {e}"
 
-    # Auto-inject total_price guard at the front of the pipeline.
-    # Condition: pipeline references total_price AND the very first stage is not
-    # already a $match with {total_price: {$gt: 0}}.
-    # We check only the first stage so that a $gt on a different field (e.g. unit_price)
-    # or a $gt placed after a $group does NOT suppress the injection.
-    pipeline_str = json.dumps(pipeline)
-    if "total_price" in pipeline_str:
-        first_stage_is_guard = (
-            pipeline
-            and "$match" in pipeline[0]
-            and pipeline[0]["$match"].get("total_price", {}).get("$gt") == 0
-        )
-        if not first_stage_is_guard:
-            pipeline = [{"$match": {"total_price": {"$gt": 0}}}] + pipeline
+    # ── Validate + sanitize (injects $gt guard, blocks dangerous stages) ──────
+    try:
+        pipeline = validate_pipeline(pipeline)
+    except ValueError as e:
+        return f"Pipeline validation error: {e}"
 
+    # ── Explain the pipeline before execution ─────────────────────────────────
+    explanation = explain_query("", pipeline)
+
+    # ── Execute ───────────────────────────────────────────────────────────────
     try:
         results = list(_collection.aggregate(pipeline))
         serialized = _serialize(results)
         output = json.dumps(serialized, indent=2)
         if len(output) > 8000:
             output = output[:8000] + "\n... (truncated)"
-        return output if results else "No results found for this query."
+        data_section = output if results else "No results found for this query."
     except Exception as e:
         return f"MongoDB error: {e}"
+
+    # ── Save key facts to session memory ─────────────────────────────────────
+    session_id = _current_session_id.get()
+    if session_id and results:
+        memory.extract_and_save(session_id, pipeline, results)
+
+    # ── Return explanation + data so LLM can cite both ────────────────────────
+    if explanation:
+        return f"{explanation}\n\nQuery results:\n{data_section}"
+    return data_section
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
@@ -194,17 +212,22 @@ Your job is to answer user questions by querying a MongoDB collection of purchas
 
 WORKFLOW:
 1. Understand the user's question.
-2. If needed, call get_schema() to confirm field names and types.
-3. Build a precise MongoDB aggregation pipeline and call query_orders() with it.
-4. Interpret the results and give the user a clear, direct answer.
-5. Always include numbers, amounts (formatted as $X,XXX.XX), and named entities in your answer.
+2. If stored session context is provided (prefixed "[Stored context]"), use it to resolve
+   references like "that quarter", "the same supplier", or "previous result" before querying.
+3. If needed, call get_schema() to confirm field names and types.
+4. Build a precise MongoDB aggregation pipeline and call query_orders() with it.
+   - For multi-step questions (e.g. "top supplier in the highest-spend quarter"),
+     run the first pipeline, then use that result to build and run the second pipeline.
+5. The tool returns a "Reasoning:" line followed by query results — include the reasoning
+   in your answer so the user understands how the result was obtained.
+6. Give the user a clear, direct answer with numbers formatted as $X,XXX.XX.
 
 RULES:
 - Always use snake_case field names exactly as in the schema.
 - For time-based queries: use the `year`, `month`, and `quarter` integer fields — not creation_date string parsing.
 - Quarter values are CALENDAR quarters: Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Sep, Q4=Oct–Dec. April–June (California fiscal year-end) is Q2.
-- For ALL spending queries: ALWAYS start with {"$match": {"total_price": {"$gt": 0}}} to exclude null and negative values. Never skip this step.
-- Trust the query results — always report the exact value returned, do not second-guess or say results are unreliable.
+- For ALL spending queries: ALWAYS start with {"$match": {"total_price": {"$gt": 0}}}. The validator enforces this, but always include it explicitly.
+- Trust the query results — always report the exact value returned. Never say results are unreliable.
 - When the user asks about "most ordered", clarify whether they mean by order count or total quantity.
 - If results are empty, tell the user clearly and suggest why (e.g., date out of range).
 - Never make up numbers — always query first.
@@ -224,17 +247,30 @@ _agent = create_react_agent(
 
 # ── Public chat function (called by main.py) ──────────────────────────────────
 async def chat(session_id: str, user_message: str) -> str:
+
+    # ── 1. Scope detection ────────────────────────────────────────────────────
+    if is_out_of_scope(user_message):
+        return out_of_scope_reply()
+
+    # ── 2. Make session_id available inside the query_orders tool ─────────────
+    _current_session_id.set(session_id)
+
+    # ── 3. Build message list ─────────────────────────────────────────────────
     history = _histories.setdefault(session_id, [])
+    messages = []
 
-    # Build message list: system context is handled by the agent prompt
-    messages = history + [HumanMessage(content=user_message)]
+    # Inject stored session context so agent can resolve follow-up references
+    ctx = memory.context_summary(session_id)
+    if ctx:
+        messages.append(SystemMessage(content=ctx))
 
+    messages += history + [HumanMessage(content=user_message)]
+
+    # ── 4. Run agent ──────────────────────────────────────────────────────────
     result = await _agent.ainvoke({"messages": messages})
-
-    # Last message in the result is the assistant's final answer
     answer = result["messages"][-1].content
 
-    # Update session history (keep last 20 messages = 10 turns)
+    # ── 5. Update conversation history (keep last 20 messages = 10 turns) ─────
     history.append(HumanMessage(content=user_message))
     history.append(AIMessage(content=answer))
     _histories[session_id] = history[-20:]
