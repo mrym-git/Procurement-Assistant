@@ -35,74 +35,73 @@
 
 ---
 
-## What Needs To Be Done 🔲
-
-### Phase 2 — AI Agent (Backend) — Day 1
+### Phase 2 — AI Agent (Backend) (Complete)
 
 **Goal:** Python backend that receives a natural language query, converts it to a MongoDB aggregation pipeline, runs it, and returns an answer.
 
----
-
 #### 2.1 — Agent Core (`backend/agent.py`)
 
-- [ ] Use **LangChain** as the agentic framework to structure the agent logic
-- [ ] Connect to MongoDB (`procurement_db.orders`)
-- [ ] Build a system prompt that describes the full schema and instructs the LLM to generate valid MongoDB aggregation pipelines
-- [ ] Define LangChain **Tools** the agent can call:
-
-| Tool | Purpose |
-|------|---------|
-| `query_orders` | Execute any aggregation pipeline on `orders`, return results |
-| `get_schema` | Return all field names, types, and descriptions |
-| `get_date_range` | Return min/max `creation_date` so agent knows the dataset bounds |
-
-- [ ] Implement the agentic loop using `LangChain AgentExecutor`:
-  1. User sends a natural language message
-  2. LangChain agent decides which tool(s) to call
-  3. `query_orders` tool builds and executes the MongoDB pipeline
-  4. Agent receives results and formulates a natural language answer
-- [ ] Use **OpenAI API** (`gpt-4.5`) as the LLM backing the agent
-- [ ] Handle edge cases: empty results, invalid pipelines, ambiguous questions
-
----
+| Task | Status | Notes |
+|------|--------|-------|
+| Agentic framework | ✅ Done | LangGraph `create_react_agent` (replaced deprecated `AgentExecutor`) |
+| MongoDB connection | ✅ Done | Connected to `procurement_db.orders` |
+| System prompt | ✅ Done | Full schema description + pipeline generation rules |
+| `get_schema` tool | ✅ Done | Returns all field names, types, descriptions |
+| `get_date_range` tool | ✅ Done | Returns min/max `creation_date` from collection |
+| `query_orders` tool | ✅ Done | Executes any aggregation pipeline, serializes results |
+| LLM integration | ✅ Done | OpenAI via `ChatOpenAI` (`gpt-5.4-mini`) |
+| NaN/null filtering | ✅ Done | Auto-injects `{"$gt": 0}` guard for all spending queries |
+| Edge case handling | ✅ Done | Empty results, invalid JSON, MongoDB errors |
+| Session history | ✅ Done | Last 20 messages (10 turns) kept per session |
 
 #### 2.2 — FastAPI Backend (`backend/main.py`)
 
-- [ ] `POST /chat` — accepts `{ session_id, message }`, returns `{ answer }`
-- [ ] `GET /health` — confirms API and MongoDB are up
-- [ ] CORS enabled for frontend
-- [ ] Session-based conversation history (last N messages passed to LLM for context)
+| Task | Status | Notes |
+|------|--------|-------|
+| `POST /api/chat` | ✅ Done | Accepts `{ session_id, message }`, returns `{ answer }` |
+| `GET /api/health` | ✅ Done | Pings MongoDB, reports status |
+| `GET /api/session/new` | ✅ Done | Returns fresh UUID session ID |
+| CORS | ✅ Done | Enabled for all origins |
+| Static file serving | ✅ Done | Serves frontend at `/static/` and `/` |
 
 ---
 
-### Phase 3 — Frontend — Day 1–2
+### Phase 3 — Frontend (Complete)
 
-**Goal:** Clean chat interface where users can ask procurement questions and see answers.
+**Goal:** Premium dark-themed chat interface for procurement queries.
 
 **Files:** `frontend/index.html`, `frontend/style.css`, `frontend/app.js`
 
-- [ ] Chat UI with message bubbles (user on right, assistant on left)
-- [ ] Input box + send button (Enter key support)
-- [ ] Loading indicator while waiting for response
-- [ ] Connect to `POST /chat` on the backend
-- [ ] Display assistant answer clearly
-- [ ] Optional: show the MongoDB query that was generated (collapsible)
+| Task | Status | Notes |
+|------|--------|-------|
+| Chat UI layout | ✅ Done | Sidebar + main chat area split layout |
+| Message bubbles | ✅ Done | User on right, assistant on left with avatars |
+| Input box + send button | ✅ Done | Enter to send, Shift+Enter for newline |
+| Loading indicator | ✅ Done | Animated typing dots while waiting |
+| Backend connection | ✅ Done | `POST /api/chat` with session ID |
+| Answer rendering | ✅ Done | Markdown-style formatting, bold dollar amounts |
+| Suggested queries sidebar | ✅ Done | 6 one-click sample questions |
+| Health status indicator | ✅ Done | Live dot + polling every 30s |
+| New chat button | ✅ Done | Clears history and starts fresh session |
+| Glassmorphism design | ✅ Done | Dark bg, blur panels, animated gradient orbs |
 
 ---
+
+## What Needs To Be Done 🔲
 
 ### Phase 4 — Testing & Evaluation — Day 2
 
 Test the assistant with these queries to verify accuracy:
 
-| Query | Expected behavior |
-|-------|------------------|
-| "How many orders were placed in Q3 2014?" | Filters `year=2014, quarter=3`, returns count |
-| "Which quarter had the highest spending?" | Groups by `year+quarter`, sums `total_price`, returns top 1 |
-| "Who are the top 5 suppliers by total spend?" | Groups by `supplier_name`, sums, sorts descending |
-| "What are the most frequently ordered items?" | Groups by `item_name`, counts, sorts descending |
-| "How much did the Department of Transportation spend in 2013?" | Filters dept + year, sums `total_price` |
-| "Show me all NON-IT Goods orders above $50,000" | Filters `acquisition_type` + `total_price > 50000` |
-| "What was the total spending in June 2014?" | Filters `year=2014, month=6`, sums |
+| Query | Expected behavior | Status |
+|-------|------------------|--------|
+| "How many orders were placed in Q3 2014?" | Filters `year=2014, quarter=3`, returns count | 🔲 |
+| "Which quarter had the highest spending?" | Groups by `year+quarter`, sums `total_price`, returns top 1 | 🔲 |
+| "Who are the top 5 suppliers by total spend?" | Groups by `supplier_name`, sums, sorts descending | 🔲 |
+| "What are the most frequently ordered items?" | Groups by `item_name`, counts, sorts descending | 🔲 |
+| "How much did the Department of Transportation spend in 2013?" | Filters dept + year, sums `total_price` | 🔲 |
+| "Show me all NON-IT Goods orders above $50,000" | Filters `acquisition_type` + `total_price > 50000` | 🔲 |
+| "What was the total spending in June 2014?" | Filters `year=2014, month=6`, sums | 🔲 |
 
 - [ ] All 7 test queries pass with accurate answers
 - [ ] Agent handles follow-up questions in the same session
@@ -112,19 +111,19 @@ Test the assistant with these queries to verify accuracy:
 
 ## Day-by-Day Plan
 
-### Day 1
-| Time | Task |
-|------|------|
-| Morning | Build `agent.py` — LLM tool use loop + MongoDB execution |
-| Afternoon | Build `main.py` — FastAPI `/chat` endpoint + session history |
-| Evening | Build frontend chat UI, connect to backend, test end-to-end |
+### Day 1 ✅ Complete
+| Time | Task | Status |
+|------|------|--------|
+| Morning | Build `agent.py` — LLM tool use loop + MongoDB execution | ✅ Done |
+| Afternoon | Build `main.py` — FastAPI `/chat` endpoint + session history | ✅ Done |
+| Evening | Build frontend chat UI, connect to backend, test end-to-end | ✅ Done |
 
 ### Day 2
-| Time | Task |
-|------|------|
-| Morning | Run all test queries, fix accuracy issues in system prompt |
-| Afternoon | Polish UI, add loading states, improve error messages |
-| Evening | Final review, clean up code, update `README.md` with run instructions |
+| Time | Task | Status |
+|------|------|--------|
+| Morning | Run all test queries, fix accuracy issues in system prompt | 🔲 |
+| Afternoon | Polish UI, add loading states, improve error messages | 🔲 |
+| Evening | Final review, clean up code, update `README.md` with run instructions | 🔲 |
 
 ---
 
@@ -133,10 +132,10 @@ Test the assistant with these queries to verify accuracy:
 | Layer | Technology |
 |-------|-----------|
 | Database | MongoDB (`localhost:27017`) |
-| LLM | GPT-4.5-mini (`gpt-4.5`) via OpenAI API |
-| Agentic Framework | LangChain — tools, agent executor, conversation memory |
-| Backend | Python — FastAPI |
-| Frontend | Vanilla HTML/CSS/JS |
+| LLM | `gpt-5.4-mini` via OpenAI API |
+| Agentic Framework | LangGraph — `create_react_agent`, LangChain tools |
+| Backend | Python — FastAPI + Uvicorn |
+| Frontend | Vanilla HTML/CSS/JS — glassmorphism dark theme |
 | Data prep | Pandas, Jupyter |
 
 ---
@@ -147,13 +146,13 @@ Test the assistant with these queries to verify accuracy:
 procurement-assistant/
 ├── explore_data.ipynb       ✅ Data prep & EDA
 ├── backend/
-│   ├── agent.py             🔲 LLM agent logic
-│   ├── main.py              🔲 FastAPI server
+│   ├── agent.py             ✅ LLM agent logic (LangGraph + 3 tools)
+│   ├── main.py              ✅ FastAPI server (chat, health, session endpoints)
 │   └── requirements.txt     ✅ Backend dependencies
 ├── frontend/
-│   ├── index.html           🔲 Chat UI
-│   ├── style.css            🔲 Styling
-│   └── app.js               🔲 API calls & chat logic
+│   ├── index.html           ✅ Chat UI (sidebar + main area)
+│   ├── style.css            ✅ Glassmorphism dark theme
+│   └── app.js               ✅ API calls, session management, markdown rendering
 ├── requirements.txt         ✅ Top-level dependencies
 ├── README.md                ✅ Setup guide
 └── PROGRESS.md              ✅ This file
