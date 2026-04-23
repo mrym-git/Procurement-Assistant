@@ -45,22 +45,24 @@
 
 #### 2.1 — Agent Core (`backend/agent.py`)
 
+- [ ] Use **LangChain** as the agentic framework to structure the agent logic
 - [ ] Connect to MongoDB (`procurement_db.orders`)
-- [ ] Build system prompt that describes the schema and instructs the LLM to generate MongoDB queries
-- [ ] Implement the agentic loop:
-  1. User sends a natural language message
-  2. LLM generates a MongoDB aggregation pipeline (as JSON)
-  3. Backend executes the pipeline
-  4. Result passed back to LLM to formulate a natural language answer
-- [ ] Handle edge cases: empty results, invalid queries, ambiguous questions
-- [ ] Use **OpenAI API** (`gpt-4.5-mini`)
+- [ ] Build a system prompt that describes the full schema and instructs the LLM to generate valid MongoDB aggregation pipelines
+- [ ] Define LangChain **Tools** the agent can call:
 
-**Suggested tools to expose to the agent:**
 | Tool | Purpose |
 |------|---------|
-| `query_orders` | Run any aggregation pipeline on `orders` |
-| `get_schema` | Return field names and types |
-| `get_date_range` | Return min/max `creation_date` |
+| `query_orders` | Execute any aggregation pipeline on `orders`, return results |
+| `get_schema` | Return all field names, types, and descriptions |
+| `get_date_range` | Return min/max `creation_date` so agent knows the dataset bounds |
+
+- [ ] Implement the agentic loop using `LangChain AgentExecutor`:
+  1. User sends a natural language message
+  2. LangChain agent decides which tool(s) to call
+  3. `query_orders` tool builds and executes the MongoDB pipeline
+  4. Agent receives results and formulates a natural language answer
+- [ ] Use **OpenAI API** (`gpt-4.5-mini`) as the LLM backing the agent
+- [ ] Handle edge cases: empty results, invalid pipelines, ambiguous questions
 
 ---
 
@@ -132,6 +134,7 @@ Test the assistant with these queries to verify accuracy:
 |-------|-----------|
 | Database | MongoDB (`localhost:27017`) |
 | LLM | GPT-4.5-mini (`gpt-4.5-mini`) via OpenAI API |
+| Agentic Framework | LangChain — tools, agent executor, conversation memory |
 | Backend | Python — FastAPI |
 | Frontend | Vanilla HTML/CSS/JS |
 | Data prep | Pandas, Jupyter |
