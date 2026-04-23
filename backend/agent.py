@@ -5,11 +5,10 @@ from typing import Any
 
 from bson import ObjectId
 from dotenv import load_dotenv
-from langchain.agents import AgentExecutor, create_openai_tools_agent
-from langchain.tools import tool
-from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 from pymongo import MongoClient
 
 load_dotenv()
@@ -148,44 +147,32 @@ RULES:
 - Keep answers concise and professional, as if speaking to a procurement manager.
 """
 
-# ── LLM + Agent setup ─────────────────────────────────────────────────────────
-_llm = ChatOpenAI(model="gpt-4.5-mini", temperature=0)
-
-_prompt = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    MessagesPlaceholder("chat_history"),
-    ("human", "{input}"),
-    MessagesPlaceholder("agent_scratchpad"),
-])
-
+# ── LLM + Agent setup (LangGraph) ────────────────────────────────────────────
+_llm   = ChatOpenAI(model="gpt-4.5-mini", temperature=0)
 _tools = [get_schema, get_date_range, query_orders]
 
-_agent = create_openai_tools_agent(_llm, _tools, _prompt)
-
-_executor = AgentExecutor(
-    agent=_agent,
+# create_react_agent from langgraph.prebuilt — replaces deprecated AgentExecutor
+_agent = create_react_agent(
+    model=_llm,
     tools=_tools,
-    verbose=True,
-    max_iterations=5,
-    handle_parsing_errors=True,
+    prompt=SYSTEM_PROMPT,
 )
 
 # ── Public chat function (called by main.py) ──────────────────────────────────
 async def chat(session_id: str, user_message: str) -> str:
     history = _histories.setdefault(session_id, [])
 
-    result = await _executor.ainvoke({
-        "input": user_message,
-        "chat_history": history,
-    })
+    # Build message list: system context is handled by the agent prompt
+    messages = history + [HumanMessage(content=user_message)]
 
-    answer = result["output"]
+    result = await _agent.ainvoke({"messages": messages})
 
-    # Update session history
+    # Last message in the result is the assistant's final answer
+    answer = result["messages"][-1].content
+
+    # Update session history (keep last 20 messages = 10 turns)
     history.append(HumanMessage(content=user_message))
     history.append(AIMessage(content=answer))
-
-    # Keep last 20 messages (10 conversation turns) to manage context size
     _histories[session_id] = history[-20:]
 
     return answer

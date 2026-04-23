@@ -10,7 +10,8 @@
       "Bash(pip install:*)",
       "Bash(\"C:\\\\Users\\\\SP7\\\\Desktop\\\\procurement-assistant\\\\README.md\":*)",
       "Bash(sc query:*)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(python main.py)"
     ]
   }
 }

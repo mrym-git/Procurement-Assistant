@@ -10,6 +10,11 @@
 </head>
 <body>
 
+  <!-- Background orbs — required for glassmorphism to look good -->
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
   <div class="app">
 
     <!-- ── Sidebar ── -->
@@ -17,106 +22,98 @@
       <div class="sidebar-top">
         <div class="logo">
           <div class="logo-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 3h18v4H3zM3 10h18v4H3zM3 17h18v4H3z"/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
           </div>
           <span class="logo-text">ProcureAI</span>
         </div>
         <p class="sidebar-desc">California State procurement intelligence, powered by AI.</p>
-
         <div class="dataset-badge">
           <span class="badge-dot"></span>
-          <span>346,018 orders · 2012–2015</span>
+          346,018 orders · 2012–2015
         </div>
       </div>
 
+      <div class="divider"></div>
+
       <div class="sidebar-section">
-        <p class="section-label">Try asking</p>
+        <p class="section-label">Suggested queries</p>
         <div class="suggestions">
           <button class="suggestion-btn" onclick="askSample('Which quarter had the highest total spending?')">
-            <span class="suggestion-icon">📊</span>
-            Highest spending quarter
+            <span class="s-icon">📊</span>Highest spending quarter
           </button>
           <button class="suggestion-btn" onclick="askSample('Who are the top 5 suppliers by total spend?')">
-            <span class="suggestion-icon">🏢</span>
-            Top suppliers by spend
+            <span class="s-icon">🏢</span>Top suppliers by spend
           </button>
           <button class="suggestion-btn" onclick="askSample('How many orders were placed in Q3 2014?')">
-            <span class="suggestion-icon">📅</span>
-            Orders in Q3 2014
+            <span class="s-icon">📅</span>Orders in Q3 2014
           </button>
           <button class="suggestion-btn" onclick="askSample('What are the most frequently ordered items?')">
-            <span class="suggestion-icon">📦</span>
-            Most ordered items
+            <span class="s-icon">📦</span>Most ordered items
           </button>
           <button class="suggestion-btn" onclick="askSample('What was the total spending by the Department of Transportation in 2013?')">
-            <span class="suggestion-icon">🏛️</span>
-            Dept. of Transportation spend
+            <span class="s-icon">🏛️</span>Transportation spend 2013
           </button>
           <button class="suggestion-btn" onclick="askSample('Show monthly spending trend for 2014')">
-            <span class="suggestion-icon">📈</span>
-            Monthly trend 2014
+            <span class="s-icon">📈</span>Monthly trend 2014
           </button>
         </div>
       </div>
 
       <div class="sidebar-footer">
-        <div class="status-indicator" id="statusIndicator">
+        <div class="status-pill" id="statusIndicator">
           <span class="status-dot" id="statusDot"></span>
-          <span id="statusText">Connecting...</span>
+          <span id="statusText">Connecting…</span>
         </div>
       </div>
     </aside>
 
-    <!-- ── Main chat area ── -->
+    <!-- ── Chat ── -->
     <main class="chat-area">
 
       <header class="chat-header">
-        <div class="header-left">
-          <h1>Procurement Assistant</h1>
-          <p>Ask anything about California State purchasing data</p>
+        <div class="header-info">
+          <h1 class="header-title">Procurement Assistant</h1>
+          <p class="header-sub">Ask anything about California State purchasing data</p>
         </div>
         <button class="new-chat-btn" onclick="newChat()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
           New chat
         </button>
       </header>
 
       <div class="messages" id="messages">
-        <!-- Welcome message -->
         <div class="message assistant-message" id="welcomeMsg">
           <div class="avatar assistant-avatar">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
             </svg>
           </div>
           <div class="bubble">
-            <p>Hello! I'm your procurement intelligence assistant.</p>
-            <p>I have access to <strong>346,018 California State purchase orders</strong> from 2012 to 2015. Ask me about spending trends, top suppliers, department budgets, or any procurement insight you need.</p>
-            <p>Use the suggestions on the left to get started, or type your own question below.</p>
+            <p>Hello! I'm your <strong>procurement intelligence assistant</strong>.</p>
+            <p>I have access to <strong>346,018 California State purchase orders</strong> spanning 2012–2015. Ask me about spending trends, top suppliers, department budgets, quarterly analysis, or any procurement insight you need.</p>
+            <p>Pick a suggestion from the sidebar or type your own question below.</p>
           </div>
         </div>
       </div>
 
       <div class="input-area">
-        <div class="input-wrapper">
+        <div class="input-glass">
           <textarea
             id="userInput"
-            placeholder="Ask about procurement data..."
+            placeholder="Ask about procurement data…"
             rows="1"
             onkeydown="handleKey(event)"
             oninput="autoResize(this)"
           ></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
             </svg>
           </button>
         </div>
-        <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+        <p class="input-hint"><kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> for new line</p>
       </div>
 
     </main>
