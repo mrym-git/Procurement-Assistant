@@ -18,6 +18,38 @@ load_dotenv()
 _client     = MongoClient(os.getenv("MONGODB_URI", "mongodb://localhost:27017/"))
 _collection = _client["procurement_db"]["orders"]
 
+# ── Startup data fix — convert BSON Double NaN to null ───────────────────────
+# When pandas float64 NaN values are inserted via PyMongo they are stored as
+# BSON Double NaN (not BSON null). MongoDB's $sum propagates NaN through the
+# whole group even when a $match {$gt: 0} is in place.
+# Fix: overwrite every NaN with null once at startup so all aggregations are clean.
+# PyMongo passes float('nan') as BSON Double NaN in the query filter, which
+# MongoDB matches against stored NaN doubles.
+def _fix_nan(field: str) -> None:
+    """
+    Replace BSON Double NaN in `field` with null.
+    Uses an aggregation-pipeline update so NaN detection follows IEEE 754:
+    a value is NaN if and only if it is a number that is neither >= 0 nor <= 0.
+    Regular query operators ($eq, $gt) are unreliable against BSON NaN across
+    MongoDB versions, so we use $gte/$lte inside $expr instead.
+    """
+    result = _collection.update_many(
+        {field: {"$type": "double"}},          # only scan double fields — NaN is always a double
+        [{"$set": {field: {"$cond": {
+            "if": {"$and": [
+                {"$not": [{"$gte": [f"${field}", 0]}]},   # NaN >= 0 is false
+                {"$not": [{"$lte": [f"${field}", 0]}]},   # NaN <= 0 is false
+            ]},
+            "then": None,      # it's NaN → replace with null
+            "else": f"${field}"  # valid number → keep as-is
+        }}}}]
+    )
+    if result.modified_count:
+        print(f"[startup] Replaced {result.modified_count} NaN values in '{field}' with null")
+
+_fix_nan("total_price")
+_fix_nan("unit_price")
+
 # ── In-memory session history (session_id → list of messages) ─────────────────
 _histories: dict[str, list] = {}
 
@@ -80,8 +112,9 @@ month              | int      | Month number 1–12 from creation_date
 quarter            | int      | Quarter 1–4 from creation_date (Q4 = Apr–Jun, fiscal year-end)
 
 Notes:
-- total_price may contain null, NaN, or negative values — ALWAYS filter with {"total_price": {"$gt": 0}} in every spending query
-- quarter 4 (April–June) is always the highest-spending quarter due to fiscal year-end
+- total_price may contain null or negative values — ALWAYS filter with {"total_price": {"$gt": 0}} in every spending query
+- quarter values use CALENDAR quarters (pandas dt.quarter): Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Sep, Q4=Oct–Dec
+- April–June (fiscal year-end for California) is stored as quarter 2, NOT quarter 4
 - Date range: 2012-07-02 to 2015-06-30
 """
 
@@ -169,7 +202,9 @@ WORKFLOW:
 RULES:
 - Always use snake_case field names exactly as in the schema.
 - For time-based queries: use the `year`, `month`, and `quarter` integer fields — not creation_date string parsing.
-- For ALL spending queries: ALWAYS start with {"$match": {"total_price": {"$gt": 0}}} to exclude null, NaN, and negative values. Never skip this step.
+- Quarter values are CALENDAR quarters: Q1=Jan–Mar, Q2=Apr–Jun, Q3=Jul–Sep, Q4=Oct–Dec. April–June (California fiscal year-end) is Q2.
+- For ALL spending queries: ALWAYS start with {"$match": {"total_price": {"$gt": 0}}} to exclude null and negative values. Never skip this step.
+- Trust the query results — always report the exact value returned, do not second-guess or say results are unreliable.
 - When the user asks about "most ordered", clarify whether they mean by order count or total quantity.
 - If results are empty, tell the user clearly and suggest why (e.g., date out of range).
 - Never make up numbers — always query first.
