@@ -143,7 +143,7 @@ for r in sample:
     if isinstance(val, float) and math.isnan(val):
         print(f"  {label}: NaN  ← still broken")
     else:
-        print(f"  {label}: ${val:,.2f}  ✓")
+        print(f"  {label}: ${val:,.2f}  OK")
 
 nan_remaining = col_db.count_documents({"total_price": float("nan")})
 print(f"\nNaN total_price docs remaining: {nan_remaining}")
