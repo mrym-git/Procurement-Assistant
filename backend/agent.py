@@ -65,7 +65,7 @@ month              | int      | Month number 1–12 from creation_date
 quarter            | int      | Quarter 1–4 from creation_date (Q4 = Apr–Jun, fiscal year-end)
 
 Notes:
-- total_price has ~30 null values (incomplete/cancelled orders) and some capped outliers at $999,999
+- total_price may contain null, NaN, or negative values — ALWAYS filter with {"total_price": {"$gt": 0}} in every spending query
 - quarter 4 (April–June) is always the highest-spending quarter due to fiscal year-end
 - Date range: 2012-07-02 to 2015-06-30
 """
@@ -114,11 +114,16 @@ def query_orders(pipeline_json: str) -> str:
     except json.JSONDecodeError as e:
         return f"Error: invalid JSON — {e}"
 
+    # Auto-inject total_price filter if pipeline touches price but has no $gt guard
+    pipeline_str = json.dumps(pipeline)
+    needs_price_filter = "total_price" in pipeline_str and '"$gt"' not in pipeline_str
+    if needs_price_filter:
+        pipeline = [{"$match": {"total_price": {"$gt": 0}}}] + pipeline
+
     try:
         results = list(_collection.aggregate(pipeline))
         serialized = _serialize(results)
         output = json.dumps(serialized, indent=2)
-        # Truncate very large outputs to avoid exceeding context limits
         if len(output) > 8000:
             output = output[:8000] + "\n... (truncated)"
         return output if results else "No results found for this query."
@@ -140,7 +145,7 @@ WORKFLOW:
 RULES:
 - Always use snake_case field names exactly as in the schema.
 - For time-based queries: use the `year`, `month`, and `quarter` integer fields — not creation_date string parsing.
-- For spending queries: filter out null total_price values with $ne: null.
+- For ALL spending queries: ALWAYS start with {"$match": {"total_price": {"$gt": 0}}} to exclude null, NaN, and negative values. Never skip this step.
 - When the user asks about "most ordered", clarify whether they mean by order count or total quantity.
 - If results are empty, tell the user clearly and suggest why (e.g., date out of range).
 - Never make up numbers — always query first.
