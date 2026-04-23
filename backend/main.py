@@ -11,13 +11,11 @@ from pydantic import BaseModel
 
 load_dotenv()
 
-from backend.import_data import init_db, get_all_vendors, get_all_orders, get_inventory
 from agent import chat
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
     yield
 
 
@@ -63,19 +61,9 @@ async def chat_endpoint(req: ChatRequest):
     return ChatResponse(session_id=session_id, reply=reply)
 
 
-@app.get("/api/vendors")
-async def list_vendors():
-    return get_all_vendors()
-
-
-@app.get("/api/orders")
-async def list_orders(status: str | None = None):
-    return get_all_orders(status)
-
-
-@app.get("/api/inventory")
-async def list_inventory(low_stock_only: bool = False):
-    return get_inventory(low_stock_only)
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
 
 
 @app.get("/api/session/new")
