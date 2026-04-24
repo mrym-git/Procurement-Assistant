@@ -271,30 +271,79 @@ async function sendMessage() {
   setLoading(true);
   showTyping();
 
+  let bubble = null;
+  let rawText = "";
+  let isCached = false;
+
   try {
-    const res = await fetch(`${API}/api/chat`, {
+    const res = await fetch(`${API}/api/stream`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ session_id: sessionId, message: text }),
     });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
 
-    sessionId = data.session_id;
-    localStorage.setItem("procurement_session", sessionId);
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = "";
 
-    hideTyping();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    // ── Build assistant bubble ────────────────────────────────────────────
-    const { bubble } = addMessage(formatText(data.reply), "assistant");
+      // SSE lines are separated by double newlines
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop(); // keep incomplete chunk
 
-    // Render enrichment layers in order
-    if (data.anomalies?.length) renderAnomalies(bubble, data.anomalies);
-    if (data.chart)              renderChart(bubble, data.chart);
-    if (data.results?.length)    renderCsvButton(bubble, data.results);
-    renderMeta(bubble, data.confidence, data.cached);
-    if (data.suggestions?.length) renderSuggestions(bubble, data.suggestions);
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith("data:")) continue;
+        let event;
+        try { event = JSON.parse(line.slice(5).trim()); }
+        catch { continue; }
+
+        if (event.type === "session") {
+          sessionId = event.session_id;
+          localStorage.setItem("procurement_session", sessionId);
+
+        } else if (event.type === "cache_hit") {
+          isCached = true;
+
+        } else if (event.type === "token") {
+          if (!bubble) {
+            hideTyping();
+            ({ bubble } = addMessage("", "assistant"));
+          }
+          rawText += event.content;
+          bubble.innerHTML = formatText(rawText);
+          scrollToBottom();
+
+        } else if (event.type === "chart") {
+          if (bubble) renderChart(bubble, event.data);
+
+        } else if (event.type === "anomalies") {
+          if (bubble && event.data?.length) renderAnomalies(bubble, event.data);
+
+        } else if (event.type === "results") {
+          if (bubble && event.data?.length) renderCsvButton(bubble, event.data);
+
+        } else if (event.type === "meta") {
+          if (bubble) renderMeta(bubble, event.confidence, isCached);
+
+        } else if (event.type === "suggestions") {
+          if (bubble && event.data?.length) renderSuggestions(bubble, event.data);
+
+        } else if (event.type === "error") {
+          hideTyping();
+          addMessage(`<p>Sorry, something went wrong: <strong>${event.content}</strong></p>`, "assistant");
+
+        } else if (event.type === "done") {
+          if (!bubble) { hideTyping(); addMessage("<p>No response.</p>", "assistant"); }
+        }
+      }
+    }
 
   } catch (err) {
     hideTyping();

@@ -318,6 +318,8 @@ async def chat_stream(session_id: str, user_message: str):
             yield {"type": "chart",       "data": cached["chart"]}
         if cached.get("anomalies"):
             yield {"type": "anomalies",   "data": cached["anomalies"]}
+        if cached.get("results"):
+            yield {"type": "results",     "data": cached["results"]}
         if cached.get("confidence"):
             yield {"type": "meta",        "confidence": cached["confidence"]}
         if cached.get("suggestions"):
@@ -361,13 +363,15 @@ async def chat_stream(session_id: str, user_message: str):
 
     chart      = build_chart_spec(last_pipeline, last_results)
     anomalies  = detect_anomalies(last_results)
-    confidence = confidence_score(last_pipeline) if last_pipeline else "N/A"
+    confidence = confidence_score(last_pipeline, last_results) if last_pipeline else "N/A"
     suggestions = generate_suggestions(user_message, last_pipeline, last_results)
 
     if chart:
         yield {"type": "chart",       "data": chart}
     if anomalies:
         yield {"type": "anomalies",   "data": anomalies}
+    if last_results:
+        yield {"type": "results",     "data": last_results}
 
     yield {"type": "meta",        "confidence": confidence}
     yield {"type": "suggestions", "data": suggestions}
@@ -377,6 +381,7 @@ async def chat_stream(session_id: str, user_message: str):
         session_id, user_message, full_answer,
         chart=chart, anomalies=anomalies,
         confidence=confidence, suggestions=suggestions,
+        results=last_results if last_results else None,
     )
 
     yield {"type": "done"}

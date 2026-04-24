@@ -598,6 +598,20 @@ kbd {
 .confidence-pill.medium { background: rgba(251,191,36,0.12); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
 .confidence-pill.low    { background: rgba(244,63,94,0.12);  color: #f43f5e; border: 1px solid rgba(244,63,94,0.3); }
 
+.confidence-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: help;
+}
+
+.confidence-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
 .cache-badge {
   display: inline-flex;
   align-items: center;

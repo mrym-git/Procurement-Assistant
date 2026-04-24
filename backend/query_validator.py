@@ -67,34 +67,57 @@ def validate_pipeline(pipeline: list) -> list:
     return pipeline
 
 
-def confidence_score(pipeline: list) -> str:
+def confidence_score(pipeline: list, results: list | None = None) -> str:
     """
-    Return "High", "Medium", or "Low" based on how specifically scoped
-    the pipeline's $match stage is.
+    Return "High", "Medium", or "Low" based on BOTH query structure and result quality.
 
-    High   — 2+ specific filters (e.g. year + quarter, year + supplier)
-    Medium — 1 specific filter
-    Low    — no scoping filters; relies on the soft $limit guard
+    High   — clear aggregation ($group+$sort or $sum/$count) AND non-empty valid results
+    Medium — partial aggregation OR results exist but have quality issues
+    Low    — no aggregation, empty results, NaN/null in key fields, or invalid pipeline
     """
+    import json, math
+
     if not pipeline:
         return "Low"
 
-    # Collect all $match bodies from the pipeline
-    match_fields: set[str] = set()
-    for stage in pipeline:
-        if "$match" in stage and isinstance(stage["$match"], dict):
-            match_fields.update(stage["$match"].keys())
+    pipeline_str = json.dumps(pipeline).lower()
+    stage_ops = [next(iter(s)) for s in pipeline if isinstance(s, dict)]
 
-    specific = frozenset({
-        "year", "month", "quarter", "creation_date",
-        "supplier_name", "department_name", "acquisition_type",
-        "fiscal_year", "item_name",
-    })
+    has_group = "$group" in stage_ops
+    has_count = "$count" in stage_ops
+    has_sort  = "$sort"  in stage_ops
 
-    count = len(match_fields & specific)
+    # ── Structure score ───────────────────────────────────────────────────────
+    if not has_group and not has_count:
+        structure = "low"
+    elif (has_group and has_sort) or (has_group and ("$sum" in pipeline_str or "$count" in pipeline_str)):
+        structure = "high"
+    else:
+        structure = "medium"
 
-    if count >= 2:
+    # ── Result quality score ──────────────────────────────────────────────────
+    if not results:
+        result_quality = "low"
+    else:
+        # Check for NaN / null in any numeric field of any result document
+        has_bad = False
+        for doc in results:
+            for k, v in doc.items():
+                if k == "_id":
+                    continue
+                if v is None:
+                    has_bad = True
+                    break
+                if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                    has_bad = True
+                    break
+            if has_bad:
+                break
+        result_quality = "low" if has_bad else "high"
+
+    # ── Combine ───────────────────────────────────────────────────────────────
+    if structure == "high" and result_quality == "high":
         return "High"
-    elif count == 1:
-        return "Medium"
-    return "Low"
+    if structure == "low" or result_quality == "low":
+        return "Low"
+    return "Medium"

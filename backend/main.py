@@ -161,7 +161,7 @@ async def chat_endpoint(req: ChatRequest):
 
     chart       = build_chart_spec(last_pipeline, last_results)
     anomalies   = detect_anomalies(last_results) or None
-    confidence  = confidence_score(last_pipeline) if last_pipeline else None
+    confidence  = confidence_score(last_pipeline, last_results) if last_pipeline else None
     suggestions = generate_suggestions(msg, last_pipeline, last_results)
 
     # ── Cache for follow-up ────────────────────────────────────────────────────
