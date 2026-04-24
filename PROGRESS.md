@@ -178,8 +178,26 @@ Upgraded the system from a basic LLM tool loop into a proper AI agent architectu
 | Imports | Added `contextvars`, `query_explainer`, `query_validator`, `scope_detector`, `session_memory` |
 | Module level | Added `_current_session_id` contextvar — passes session_id into tool scope without changing signature |
 | `query_orders` body | Replaced manual `$gt` inject with `validate_pipeline()` + `explain_query()` + `memory.extract_and_save()` |
+| `query_orders` return | Returns 3-section string: `Reasoning` + `MongoDB Pipeline Used` (validated pipeline as pretty JSON) + `Query Results` |
 | `chat()` function | Added scope check → contextvar set → session context `SystemMessage` injection → agent invoke |
 | `SYSTEM_PROMPT` | Added multi-step workflow instructions, context resolution rules, reasoning citation rule |
+
+#### `query_orders` tool output format
+
+Every tool call now returns:
+
+```
+Reasoning:
+<natural language explanation of what the pipeline does>
+
+MongoDB Pipeline Used:
+<pretty-printed JSON of the validated pipeline>
+
+Query Results:
+<serialized MongoDB results>
+```
+
+The pipeline shown is the **validated** one (after `validate_pipeline()` runs), so it always reflects the exact query sent to MongoDB — including any injected `{$gt: 0}` guard or `{$limit: 5000}` stage. This satisfies the assessment requirement: *"generate the appropriate database queries and provide answers."*
 
 #### Request flow after upgrade
 

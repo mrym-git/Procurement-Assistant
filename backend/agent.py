@@ -177,16 +177,16 @@ def query_orders(pipeline_json: str) -> str:
 
     # ── Validate + sanitize (injects $gt guard, blocks dangerous stages) ──────
     try:
-        pipeline = validate_pipeline(pipeline)
+        validated = validate_pipeline(pipeline)
     except ValueError as e:
         return f"Pipeline validation error: {e}"
 
     # ── Explain the pipeline before execution ─────────────────────────────────
-    explanation = explain_query("", pipeline)
+    explanation = explain_query("", validated)
 
     # ── Execute ───────────────────────────────────────────────────────────────
     try:
-        results = list(_collection.aggregate(pipeline))
+        results = list(_collection.aggregate(validated))
         serialized = _serialize(results)
         output = json.dumps(serialized, indent=2)
         if len(output) > 8000:
@@ -200,10 +200,16 @@ def query_orders(pipeline_json: str) -> str:
     if session_id and results:
         memory.extract_and_save(session_id, pipeline, results)
 
-    # ── Return explanation + data so LLM can cite both ────────────────────────
-    if explanation:
-        return f"{explanation}\n\nQuery results:\n{data_section}"
-    return data_section
+    # ── Return explanation + validated pipeline + data ────────────────────────
+    pretty_pipeline = json.dumps(validated, indent=2)
+    return f"""Reasoning:
+{explanation}
+
+MongoDB Pipeline Used:
+{pretty_pipeline}
+
+Query Results:
+{data_section}"""
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
