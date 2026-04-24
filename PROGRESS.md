@@ -280,6 +280,8 @@ Seven enrichment features added on top of the agent architecture. All served fro
 | 16 outliers flagged on department query | IQR fence too sensitive for skewed distributions | Added 3× median requirement; capped at 5 max |
 | Hardcoded "Medi-Cal" message on all anomaly banners | Frontend always appended fixed text | Removed hardcoded suffix — banner now dynamic |
 | Old server process (PID) intercepting requests | Windows TCP FIN_WAIT2 kept old process alive on port 8000 | Kill all `python.exe` processes before restart |
+| Anomaly label showed raw dict: "month=3" | `_id` dict was joined as `k=v` pairs with no human formatting | Added `_format_label()` — converts to "Mar 2014", "Q2 2015", etc. |
+| Hardcoded "likely large Medi-Cal managed care contracts" on all anomaly banners | Frontend always appended fixed text regardless of query context | Removed hardcoded suffix entirely |
 
 ---
 

@@ -54,6 +54,7 @@ class ChatResponse(BaseModel):
     anomalies: list | None = None
     confidence: str | None = None
     suggestions: list | None = None
+    results: list | None = None
     cached: bool = False
 
 
@@ -169,6 +170,7 @@ async def chat_endpoint(req: ChatRequest):
         anomalies=anomalies,
         confidence=confidence,
         suggestions=suggestions,
+        results=last_results if last_results else None,
         cached=False,
     )
 
