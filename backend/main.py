@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi import Request
 from pydantic import BaseModel
 
 load_dotenv()
@@ -38,7 +39,11 @@ app.add_middleware(
 
 # ── Serve frontend ────────────────────────────────────────────────────────────
 frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
-app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+
+@app.get("/static/{filename:path}", include_in_schema=False)
+async def serve_static(filename: str):
+    file_path = os.path.join(frontend_dir, filename)
+    return FileResponse(file_path, headers={"Cache-Control": "no-store"})
 
 
 # ── Request / Response models ─────────────────────────────────────────────────
@@ -140,6 +145,7 @@ async def chat_endpoint(req: ChatRequest):
             anomalies=cached.get("anomalies"),
             confidence=cached.get("confidence"),
             suggestions=cached.get("suggestions"),
+            results=cached.get("results"),
             cached=True,
         )
 
@@ -161,7 +167,8 @@ async def chat_endpoint(req: ChatRequest):
     # ── Cache for follow-up ────────────────────────────────────────────────────
     query_cache.store(session_id, msg, reply,
                       chart=chart, anomalies=anomalies,
-                      confidence=confidence, suggestions=suggestions)
+                      confidence=confidence, suggestions=suggestions,
+                      results=last_results if last_results else None)
 
     return ChatResponse(
         session_id=session_id,

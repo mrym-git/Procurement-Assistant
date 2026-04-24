@@ -49,7 +49,8 @@
       "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k!=''''reply''''}, indent=2\\)\\)\")",
       "Bash(cmd //c \"taskkill /F /IM uvicorn.exe 2>nul & taskkill /F /IM python.exe 2>nul\")",
       "Bash(python:*)",
-      "Bash(curl -s -X POST http://localhost:8000/api/chat -H \"Content-Type: application/json\" -d \"{\"\"message\"\": \"\"top 5 suppliers by total spend\"\"}\" -o C:/tmp/resp2.json)"
+      "Bash(curl -s -X POST http://localhost:8000/api/chat -H \"Content-Type: application/json\" -d \"{\"\"message\"\": \"\"top 5 suppliers by total spend\"\"}\" -o C:/tmp/resp2.json)",
+      "Bash(curl -s -X POST http://localhost:8000/api/chat -H \"Content-Type: application/json\" -d \"{\"\"message\"\": \"\"top 5 suppliers by spend\"\"}\")"
     ]
   }
 }
