@@ -292,6 +292,7 @@ async function sendMessage() {
     // Render enrichment layers in order
     if (data.anomalies?.length) renderAnomalies(bubble, data.anomalies);
     if (data.chart)              renderChart(bubble, data.chart);
+    if (data.results?.length)    renderCsvButton(bubble, data.results);
     renderMeta(bubble, data.confidence, data.cached);
     if (data.suggestions?.length) renderSuggestions(bubble, data.suggestions);
 
