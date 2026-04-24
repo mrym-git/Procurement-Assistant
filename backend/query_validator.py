@@ -65,3 +65,36 @@ def validate_pipeline(pipeline: list) -> list:
         pipeline.append({"$limit": 5000})
 
     return pipeline
+
+
+def confidence_score(pipeline: list) -> str:
+    """
+    Return "High", "Medium", or "Low" based on how specifically scoped
+    the pipeline's $match stage is.
+
+    High   — 2+ specific filters (e.g. year + quarter, year + supplier)
+    Medium — 1 specific filter
+    Low    — no scoping filters; relies on the soft $limit guard
+    """
+    if not pipeline:
+        return "Low"
+
+    # Collect all $match bodies from the pipeline
+    match_fields: set[str] = set()
+    for stage in pipeline:
+        if "$match" in stage and isinstance(stage["$match"], dict):
+            match_fields.update(stage["$match"].keys())
+
+    specific = frozenset({
+        "year", "month", "quarter", "creation_date",
+        "supplier_name", "department_name", "acquisition_type",
+        "fiscal_year", "item_name",
+    })
+
+    count = len(match_fields & specific)
+
+    if count >= 2:
+        return "High"
+    elif count == 1:
+        return "Medium"
+    return "Low"

@@ -13,16 +13,19 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from pymongo import MongoClient
 
+from anomaly_detector import detect_anomalies
+from chart_builder import build_chart_spec
+from query_cache import query_cache
 from query_explainer import explain_query
-from query_validator import validate_pipeline
+from query_validator import validate_pipeline, confidence_score
 from scope_detector import is_out_of_scope, out_of_scope_reply
 from session_memory import memory
+from suggestion_generator import generate_suggestions
 
-# Context variable that carries the current session_id into tool scope
-# without changing the tool function signature.
-_current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar(
-    "session_id", default=""
-)
+# Simple module-level store for the active session_id.
+# asyncio is single-threaded so there is no race condition between
+# setting this before ainvoke() and reading it inside the tool coroutine.
+_active_session: dict[str, str] = {"id": ""}
 
 load_dotenv()
 
@@ -196,7 +199,7 @@ def query_orders(pipeline_json: str) -> str:
         return f"MongoDB error: {e}"
 
     # ── Save key facts to session memory ─────────────────────────────────────
-    session_id = _current_session_id.get()
+    session_id = _active_session["id"]
     if session_id and results:
         memory.extract_and_save(session_id, pipeline, results)
 
@@ -259,7 +262,7 @@ async def chat(session_id: str, user_message: str) -> str:
         return out_of_scope_reply()
 
     # ── 2. Make session_id available inside the query_orders tool ─────────────
-    _current_session_id.set(session_id)
+    _active_session["id"] = session_id
 
     # ── 3. Build message list ─────────────────────────────────────────────────
     history = _histories.setdefault(session_id, [])
@@ -282,3 +285,98 @@ async def chat(session_id: str, user_message: str) -> str:
     _histories[session_id] = history[-20:]
 
     return answer
+
+
+# ── Streaming chat (SSE) ──────────────────────────────────────────────────────
+async def chat_stream(session_id: str, user_message: str):
+    """
+    Async generator that yields SSE-ready dicts for the streaming endpoint.
+
+    Event types emitted (in order):
+      {"type": "cache_hit"}                          — answer served from cache
+      {"type": "token",       "content": str}        — one streamed text token
+      {"type": "chart",       "data": dict}          — Chart.js config
+      {"type": "anomalies",   "data": list}          — IQR outlier list
+      {"type": "meta",        "confidence": str}     — "High"/"Medium"/"Low"
+      {"type": "suggestions", "data": list[str]}     — follow-up questions
+      {"type": "error",       "content": str}        — agent error
+      {"type": "done"}                               — end of stream
+    """
+
+    # ── Scope check ───────────────────────────────────────────────────────────
+    if is_out_of_scope(user_message):
+        yield {"type": "token", "content": out_of_scope_reply()}
+        yield {"type": "done"}
+        return
+
+    # ── Semantic cache lookup ─────────────────────────────────────────────────
+    cached = query_cache.lookup(session_id, user_message)
+    if cached:
+        yield {"type": "cache_hit"}
+        yield {"type": "token", "content": cached["answer"]}
+        if cached.get("chart"):
+            yield {"type": "chart",       "data": cached["chart"]}
+        if cached.get("anomalies"):
+            yield {"type": "anomalies",   "data": cached["anomalies"]}
+        if cached.get("confidence"):
+            yield {"type": "meta",        "confidence": cached["confidence"]}
+        if cached.get("suggestions"):
+            yield {"type": "suggestions", "data": cached["suggestions"]}
+        yield {"type": "done"}
+        return
+
+    # ── Set session context for tools ─────────────────────────────────────────
+    _active_session["id"] = session_id
+    history = _histories.setdefault(session_id, [])
+    messages = []
+    ctx = memory.context_summary(session_id)
+    if ctx:
+        messages.append(SystemMessage(content=ctx))
+    messages += history + [HumanMessage(content=user_message)]
+
+    # ── Stream agent response ─────────────────────────────────────────────────
+    full_answer = ""
+    try:
+        async for event in _agent.astream_events({"messages": messages}, version="v2"):
+            if event["event"] == "on_chat_model_stream":
+                chunk = event["data"]["chunk"]
+                content = getattr(chunk, "content", "")
+                # Only stream final-answer tokens (tool-call chunks have empty content)
+                if isinstance(content, str) and content:
+                    yield {"type": "token", "content": content}
+                    full_answer += content
+    except Exception as e:
+        yield {"type": "error", "content": f"Agent error: {e}"}
+        yield {"type": "done"}
+        return
+
+    # ── Update history ────────────────────────────────────────────────────────
+    history.append(HumanMessage(content=user_message))
+    history.append(AIMessage(content=full_answer))
+    _histories[session_id] = history[-20:]
+
+    # ── Post-processing: chart, anomalies, confidence, suggestions ────────────
+    last_pipeline = memory.get_result(session_id, "last_query_pipeline") or []
+    last_results  = memory.get_result(session_id, "last_result_raw")     or []
+
+    chart      = build_chart_spec(last_pipeline, last_results)
+    anomalies  = detect_anomalies(last_results)
+    confidence = confidence_score(last_pipeline) if last_pipeline else "N/A"
+    suggestions = generate_suggestions(user_message, last_pipeline, last_results)
+
+    if chart:
+        yield {"type": "chart",       "data": chart}
+    if anomalies:
+        yield {"type": "anomalies",   "data": anomalies}
+
+    yield {"type": "meta",        "confidence": confidence}
+    yield {"type": "suggestions", "data": suggestions}
+
+    # ── Cache the result ──────────────────────────────────────────────────────
+    query_cache.store(
+        session_id, user_message, full_answer,
+        chart=chart, anomalies=anomalies,
+        confidence=confidence, suggestions=suggestions,
+    )
+
+    yield {"type": "done"}

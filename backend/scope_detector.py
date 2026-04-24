@@ -47,7 +47,7 @@ _PROCUREMENT_KEYWORDS: frozenset[str] = frozenset({
 _OUT_OF_SCOPE_PATTERNS: list[str] = [
     r"\bwho (is|was|are|were) (the )?governor\b",
     r"\bwhat (is|are) (mongodb|python|sql|ai|ml|machine learning|langchain|llm|gpt)\b",
-    r"\bexplain (ai|machine learning|neural network|blockchain|cryptocurrency)\b",
+    r"\bexplain (ai|machine learning|neural network|blockchain|cryptocurrency|python|sql|nosql|mongodb|javascript|programming)\b",
     r"\bwrite (a |an )?(poem|story|essay|joke|song|code|function|script)\b",
     r"\btell me (a )?joke\b",
     r"\bweather (in|for|today|tomorrow)\b",

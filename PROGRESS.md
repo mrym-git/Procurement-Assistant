@@ -223,6 +223,66 @@ All automatic — no user prompt engineering required.
 
 ---
 
+### Phase 6 — Innovation Features (Complete)
+
+Seven enrichment features added on top of the agent architecture. All served from `/api/chat` as extra JSON fields and rendered client-side.
+
+#### New modules created
+
+| File | Purpose |
+|---|---|
+| `backend/chart_builder.py` | `build_chart_spec()` — generates Chart.js config from pipeline + results |
+| `backend/anomaly_detector.py` | `detect_anomalies()` — IQR-based outlier detection (pure Python) |
+| `backend/query_cache.py` | `SemanticCache` — Jaccard similarity cache with stemming (threshold 0.55) |
+| `backend/suggestion_generator.py` | `generate_suggestions()` — rule-based follow-up question generator |
+
+#### Features
+
+| Feature | How It Works |
+|---|---|
+| **Chart rendering** | `chart_builder.py` inspects `_id` type: dict with `month` → line chart, `quarter` → bar, string → horizontal bar. Returns Chart.js config with `"format": "currency"/"count"/"number"` hint. Frontend attaches JS formatter callbacks (tick labels, tooltips). |
+| **Follow-up suggestions** | `suggestion_generator.py` reads pipeline JSON to detect context (quarterly/monthly/supplier/dept/item) and returns 3 targeted clickable chips. |
+| **Streaming responses** | `chat_stream()` async generator + `POST /api/stream` SSE endpoint. Emits `token`, `chart`, `anomalies`, `meta`, `suggestions`, `cache_hit`, `error`, `done` event types. |
+| **Semantic query cache** | `SemanticCache.lookup()` tokenizes + stems question, computes Jaccard similarity, returns cached entry if ≥ 0.55. Avoids redundant MongoDB + LLM calls. Numbers kept as tokens so "Q3 2014" ≠ "Q2 2014". |
+| **Anomaly flagging** | IQR fence (Q3 + 1.5×IQR). Requires ≥4 data points, value must be both above fence AND ≥3× median. Capped at 5 outliers. Skips `_id=None` documents. |
+| **CSV export button** | Frontend renders download button on assistant messages. Flattens `_id` dicts, generates CSV blob. |
+| **Confidence indicator** | `confidence_score()` counts specific `$match` fields. ≥2 → High (green), 1 → Medium (amber), 0 → Low (red). Shown as colored pill below each answer. |
+
+#### `/api/chat` response shape (extended)
+
+```json
+{
+  "session_id": "...",
+  "reply": "...",
+  "chart": { "type": "bar", "data": {...}, "options": {...}, "format": "currency" },
+  "anomalies": [{ "label": "...", "value": 1.2e10, "threshold": 3e9 }],
+  "confidence": "High" | "Medium" | "Low",
+  "suggestions": ["...", "...", "..."],
+  "cached": false
+}
+```
+
+#### Frontend additions (`app.js`, `style.css`, `index.html`)
+
+- `renderChart(bubble, chartConfig)` — injects Chart.js canvas, attaches formatter callbacks
+- `renderAnomalies(bubble, anomalies)` — warning banner with outlier values
+- `renderMeta(bubble, confidence, isCached)` — confidence pill + ⚡ Cached badge
+- `renderSuggestions(bubble, suggestions)` — clickable follow-up chips
+- `renderCsvButton(bubble, results)` — CSV download button
+- Chart.js 4.4 loaded via CDN in `index.html`
+
+#### Key bugs fixed during Phase 6
+
+| Bug | Root Cause | Fix |
+|---|---|---|
+| All enrichment fields returned `null` | `contextvars.ContextVar` doesn't propagate through LangGraph's async context — `session_id` was `""` in tool, so `memory.extract_and_save()` was never called | Replaced contextvar with module-level `_active_session = {"id": ""}` dict (asyncio is single-threaded) |
+| "Unknown ($111,675)" anomaly on supplier query | `_id=None` documents (summary rows) passed anomaly check | Skip any result where `_id is None` |
+| 16 outliers flagged on department query | IQR fence too sensitive for skewed distributions | Added 3× median requirement; capped at 5 max |
+| Hardcoded "Medi-Cal" message on all anomaly banners | Frontend always appended fixed text | Removed hardcoded suffix — banner now dynamic |
+| Old server process (PID) intercepting requests | Windows TCP FIN_WAIT2 kept old process alive on port 8000 | Kill all `python.exe` processes before restart |
+
+---
+
 ### Phase 4 — Testing & Debugging (Complete)
 
 All 7 test queries verified against the live system:
@@ -291,6 +351,10 @@ procurement-assistant/
 │   ├── query_explainer.py       ✅ Rule-based NL reasoning explanation
 │   ├── session_memory.py        ✅ Stateful per-session result store + context injection
 │   ├── scope_detector.py        ✅ Out-of-scope question detection
+│   ├── chart_builder.py         ✅ Chart.js config generator (line/bar/horizontal bar)
+│   ├── anomaly_detector.py      ✅ IQR outlier detection (pure Python)
+│   ├── query_cache.py           ✅ Jaccard semantic cache with stemming
+│   ├── suggestion_generator.py  ✅ Rule-based follow-up question generator
 │   ├── reload_data.py           ✅ Clean data reload script (drops NaN/zero rows)
 │   ├── fix_nan.py               ✅ One-time BSON NaN repair utility
 │   └── requirements.txt         ✅ Backend dependencies
