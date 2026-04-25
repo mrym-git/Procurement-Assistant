@@ -89,7 +89,7 @@ procurement-assistant/
 ## 🔄 System Flow
 ```
 
-User سؤال
+User question
 ↓
 Scope Detection
 ↓
