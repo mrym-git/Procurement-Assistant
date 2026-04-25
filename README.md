@@ -1,4 +1,3 @@
-```md
 # 🧠 Procurement Assistant
 
 AI-powered assistant that answers procurement queries using **MongoDB + LLM + Agent Architecture**.
@@ -176,12 +175,3 @@ http://localhost:8000
 * Explainable reasoning
 * Stateful memory
 * Smart caching + anomaly insights
-
----
-
-## ✅ Status
-
-Fully working end-to-end system ✔
-
-```
-```
