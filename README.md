@@ -1,177 +1,137 @@
-# 🧠 Procurement Assistant
+# ProcureAI — California State Procurement Intelligence
 
-AI-powered assistant that answers procurement queries using **MongoDB + LLM + Agent Architecture**.
+An AI-powered chat assistant for exploring 346,018 California State purchase orders (2012–2015), built with FastAPI, LangGraph, MongoDB, and Chart.js.
 
----
-
-## 🚀 Overview
-Ask questions like:
-- "Top suppliers by spend"
-- "Orders in Q3 2014"
-
-The system converts them into MongoDB queries and returns:
-- Exact answers
-- Charts
-- Anomalies
-- Suggestions
+![ProcureAI Screenshot](images/image.png)
 
 ---
 
-## ✨ Features
+## Features
 
-### 🤖 AI Agent
-- Natural language → MongoDB aggregation pipeline  
-- Multi-step reasoning  
-- Session memory for follow-ups  
-
-### 🛡️ Validation
-- Blocks unsafe MongoDB stages  
-- Enforces `total_price > 0`  
-- Prevents full collection scans  
-
-### 📊 Visualization
-- Auto charts (bar / line)  
-- Currency + count formatting  
-
-### ⚠️ Anomaly Detection
-- IQR-based outlier detection  
-- Flags unusual spending  
-
-### ⚡ Performance
-- Semantic cache (Jaccard similarity)  
-- Streaming responses (SSE)  
-
-### 💡 UX
-- Suggested follow-up questions  
-- Confidence indicator  
-- CSV export  
+- **Natural language queries** — ask anything about spending, suppliers, departments, or time periods
+- **Interactive charts** — automatic bar, line, and pie chart generation via Chart.js
+- **Anomaly detection** — flags unusual spending patterns in query results
+- **Smart suggestions** — follow-up query suggestions after each answer
+- **Session memory** — maintains conversation context across multiple questions
+- **Query caching** — repeated questions return instantly
+- **Streaming responses** — answers stream token by token via Server-Sent Events
+- **CSV export** — download any result table as a CSV file
 
 ---
 
-## ⚙️ Tech Stack
-- MongoDB  
-- FastAPI (Python)  
-- OpenAI (`gpt-5.4-mini`)  
-- LangGraph / LangChain  
-- HTML / CSS / JavaScript  
-- Pandas  
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI + Uvicorn |
+| AI Agent | LangGraph (ReAct) + OpenAI GPT |
+| Database | MongoDB |
+| Frontend | Vanilla JS + Chart.js |
+| Data | California State Procurement 2012–2015 |
 
 ---
 
-## 📂 Project Structure
+## Setup
+
+### Prerequisites
+
+- Python 3.11+
+- MongoDB running locally on port 27017
+- OpenAI API key
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/mrym-git/procurement-assistant.git
+cd procurement-assistant
 ```
 
+### 2. Create a virtual environment
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate      # Windows
+# source .venv/bin/activate # macOS/Linux
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
+```
+
+### 4. Configure environment variables
+
+Create a `.env` file in the project root:
+
+```env
+OPENAI_API_KEY=your-openai-api-key-here
+MONGODB_URI=mongodb://localhost:27017/
+```
+
+### 5. Load the data into MongoDB
+
+Download the dataset from Kaggle:
+[California State Procurement Data](https://www.kaggle.com/datasets/samuelcortinhas/california-state-procurement-data)
+
+Place the CSV in the project root, then run the notebook to clean and load the data:
+
+```bash
+jupyter notebook explore_data.ipynb
+```
+
+### 6. Start the server
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8000
+```
+
+Open your browser at **http://localhost:8000**
+
+---
+
+## Example Queries
+
+- How many orders were placed in Q3 2014?
+- Which quarter had the highest spending?
+- Top 5 suppliers by total spend
+- Department of Transportation spend in 2013
+- Orders above $50,000
+
+---
+
+## Project Structure
+
+```
 procurement-assistant/
 ├── backend/
-│   ├── agent.py
-│   ├── main.py
-│   ├── query_validator.py
-│   ├── query_explainer.py
-│   ├── session_memory.py
-│   ├── scope_detector.py
-│   ├── chart_builder.py
-│   ├── anomaly_detector.py
-│   ├── query_cache.py
-│   ├── suggestion_generator.py
-│   └── reload_data.py
+│   ├── main.py               # FastAPI app & routes
+│   ├── agent.py              # LangGraph ReAct agent
+│   ├── anomaly_detector.py   # Spending anomaly detection
+│   ├── chart_builder.py      # Chart.js spec builder
+│   ├── query_cache.py        # In-memory query cache
+│   ├── query_validator.py    # Confidence scoring
+│   ├── session_memory.py     # Conversation memory
+│   └── suggestion_generator.py
 ├── frontend/
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
-├── explore_data.ipynb
-├── requirements.txt
-└── README.md
-
+├── images/
+│   └── image.png
+├── explore_data.ipynb        # EDA & MongoDB data loader
+└── requirements.txt
 ```
 
 ---
 
-## 🔄 System Flow
-```
+## API Endpoints
 
-User question
-↓
-Scope Detection
-↓
-Context Injection
-↓
-AI Agent (LangGraph)
-↓
-MongoDB Query
-↓
-Validation + Explanation + Memory
-↓
-Final Response (Answer + Chart + Insights)
-
-````
-
----
-
-## 📊 Dataset
-- 335,034 records  
-- Cleaned, deduplicated, validated  
-- Key fields:
-  - total_price
-  - supplier_name
-  - department_name
-  - item_name
-  - year, month, quarter  
-
-⚠️ Large transactions (> $100M) are valid government contracts.
-
----
-
-## ▶️ Run Locally
-
-### 1. Install dependencies
-```bash
-pip install -r requirements.txt
-````
-
-### 2. Start MongoDB
-
-```bash
-mongod
-```
-
-### 3. Run backend
-
-```bash
-cd backend
-uvicorn main:app --reload
-```
-
-### 4. Open app
-
-```
-http://localhost:8000
-```
-
----
-
-## 🧪 Example Queries
-
-* How many orders were placed in Q3 2014?
-* Which quarter had the highest spending?
-* Top 5 suppliers by total spend
-* Department of Transportation spend in 2013
-* Orders above $50,000
-
----
-
-## 📌 API Endpoints
-
-* `POST /api/chat`
-* `POST /api/stream`
-* `GET /api/health`
-* `GET /api/session/new`
-
----
-
-## 🧠 Key Highlights
-
-* Agent-based architecture (not simple LLM call)
-* Pipeline validation before execution
-* Explainable reasoning
-* Stateful memory
-* Smart caching + anomaly insights
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/` | Serves the chat UI |
+| `GET` | `/api/health` | Health check (API + MongoDB status) |
+| `GET` | `/api/session/new` | Generate a new session ID |
+| `POST` | `/api/stream` | Streaming chat (SSE) |
