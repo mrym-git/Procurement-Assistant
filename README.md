@@ -6,6 +6,16 @@ An AI-powered chat assistant for exploring 346,018 California State purchase ord
 
 ---
 
+## Screenshots
+
+### Chart — Top Suppliers by Spend
+![Chart](images/chart.png)
+
+### Query Results
+![Results](images/results.png)
+
+---
+
 ## Features
 
 - **Natural language queries** — ask anything about spending, suppliers, departments, or time periods
